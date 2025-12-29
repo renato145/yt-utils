@@ -119,9 +119,9 @@ Analyse the transcript to generate a detailed summary of the content of the vide
 
 Your task:
 <task>
-1. Start with a 2-3 sentence overview of the entire video
-2. Identify where major topics begin and end (chapters)
-3. Summarise each chapter's key concepts, it should have very high information value. Do not miss any important topic.
+1. Start with a 2-3 sentence overview of the entire video.
+2. Identify chapters, where major topics begin and end.
+3. Summarise each chapter's key concepts in no more than 15 bullet points. The summary should have very high information value.
 4. Extract all resources mentioned, e.g. links, books, papers, videos, YouTube channels etc.
 </task>
 
@@ -129,6 +129,7 @@ Format your response in Markdown:
 <format>
 - Start with "## Overview" followed by the 2-3 sentence summary
 - For each chapter use: "## [Chapter Title] - HH:MM:SS", e.g.: "## Introduction - 00:02:30"
+- Follow each chapter heading with bullet points
 - End with a "## Resources" section containing a list of the resources mentioned through the video, including a brief context.
 <format>
 
@@ -149,27 +150,16 @@ Here is the video description:
     if chapters is not None:
         prompt += f'''
 
-Incase it is helpful, here are the chapters defined in the video. However, please use timestamps from the transcript when possible when constructing timestamped links. 
+Incase it is helpful, here are the chapters defined in the video. However, please use timestamps from the transcript when possible. 
 <video-chapters>
 {chapters}
 </video-chapters>
 '''
 
-    prompt += '''
-
-Keep the following writing guidelines in mind:
-<guidelines>
-1. Do not add filler words. 
-2. Make every sentence information-dense without repetition.
-3. Get to the point while providing necessary context.
-4. Use short words and fewer words.
-5. Avoid overusing bullet points. Prefer flowing prose that combines related concepts. Use lists only for truly distinct items.
-</guidelines>
-
-Please go ahead and write the summary.'''
-
     if user_prompt is not None:
         prompt += f"\n\nAdditional context/instructions from the user:\n<user-context>\n{user_prompt}\n</user-context>"
+
+    prompt += '\n\nPlease go ahead and write the detailed summary of the video and the summary of each chapter you find.'
     return prompt
 
 # %% ../nbs/00_core.ipynb 36
