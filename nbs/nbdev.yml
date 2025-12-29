@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "yt-utils"
+  site-url: "https://renato145.github.io/yt-utils"
+  description: "Youtube utilities"
+  repo-branch: main
+  repo-url: "https://github.com/renato145/yt-utils"
