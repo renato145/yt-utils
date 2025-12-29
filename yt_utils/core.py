@@ -115,23 +115,13 @@ def create_summary_prompt(self:YTVideo, user_prompt:str=None, **kwargs)->str:
     description = self.data.get('description')
     chapters = self.format_chapters()
     prompt = f'''In the <transcript> tag we have transcript of a video with the title: {self.data['title']!r}. \
-Analyse the transcript to generate a detailed summary of the content of the video.
+The goal is to analyse the transcript to generate a detailed summary of the content of the video.
 
 Your task:
-<task>
-1. Start with a 2-3 sentence overview of the entire video.
+1. Start with an overview of the entire video.
 2. Identify chapters, where major topics begin and end.
-3. Summarise each chapter's key concepts in no more than 15 bullet points. The summary should have very high information value.
+3. Summarise each chapter key concepts, the summary should have very high information value and shouldn't miss any important topic.
 4. Extract all resources mentioned, e.g. links, books, papers, videos, YouTube channels etc.
-</task>
-
-Format your response in Markdown:
-<format>
-- Start with "## Overview" followed by the 2-3 sentence summary
-- For each chapter use: "## [Chapter Title] - HH:MM:SS", e.g.: "## Introduction - 00:02:30"
-- Follow each chapter heading with bullet points
-- End with a "## Resources" section containing a list of the resources mentioned through the video, including a brief context.
-<format>
 
 Here is the transcript with timestamps:
 <transcript>
@@ -144,8 +134,7 @@ Here is the transcript with timestamps:
 Here is the video description:
 <video-description>
 {description}
-</video-description>
-'''
+</video-description>'''
 
     if chapters is not None:
         prompt += f'''
@@ -153,13 +142,20 @@ Here is the video description:
 Incase it is helpful, here are the chapters defined in the video. However, please use timestamps from the transcript when possible. 
 <video-chapters>
 {chapters}
-</video-chapters>
-'''
+</video-chapters>'''
 
     if user_prompt is not None:
         prompt += f"\n\nAdditional context/instructions from the user:\n<user-context>\n{user_prompt}\n</user-context>"
 
-    prompt += '\n\nPlease go ahead and write the detailed summary of the video and the summary of each chapter you find.'
+    prompt += '''
+
+Format your response using Markdown:
+- Start with an "## Overview" section containing the whole video summary.
+- For each chapter add a section with a heading that includes a timestamp in the format: "## [Chapter Title] - HH:MM:SS" (e.g. "## Introduction - 00:02:30").
+- Follow each chapter heading with a succinct summary and bullet points for key points if necessary.
+- End with a "## Resources" section containing a list of the resources mentioned through the video, including a brief context.
+
+Please go ahead and carefully write the detailed summary of the video.'''
     return prompt
 
 # %% ../nbs/00_core.ipynb 36
