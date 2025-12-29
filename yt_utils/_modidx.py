@@ -5,4 +5,7 @@ d = { 'settings': { 'branch': 'main',
                 'doc_host': 'https://renato145.github.io',
                 'git_url': 'https://github.com/renato145/yt-utils',
                 'lib_path': 'yt_utils'},
-  'syms': {'yt_utils.core': {'yt_utils.core.foo': ('core.html#foo', 'yt_utils/core.py')}}}
+  'syms': { 'yt_utils.core': { 'yt_utils.core.YTPlaylist': ('core.html#ytplaylist', 'yt_utils/core.py'),
+                               'yt_utils.core.YTPlaylist.__init__': ('core.html#ytplaylist.__init__', 'yt_utils/core.py'),
+                               'yt_utils.core.YTPlaylist.__repr__': ('core.html#ytplaylist.__repr__', 'yt_utils/core.py'),
+                               'yt_utils.core.YTPlaylist.from_url': ('core.html#ytplaylist.from_url', 'yt_utils/core.py')}}}
