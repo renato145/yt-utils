@@ -35,10 +35,11 @@ def from_url(cls:YTVideo, url:str, quiet:bool=True)->YTVideo:
 
 # %% ../nbs/00_core.ipynb 10
 @patch
-def subtitles_url(self:YTVideo, language:str=None):
-    lang = ifnone(language, self.data.get('language'))
+def subtitles_url(self:YTVideo, lang:str=None):
+    lang = ifnone(lang, self.data.get('language'))
     d = self.data.get('subtitles', self.data.get('automatic_captions'))
     if d is None: return
+    if lang not in d: lang = list(d.keys())[0]
     return next(o['url'] for o in d[lang] if o['ext']=='srt')
 
 # %% ../nbs/00_core.ipynb 14
@@ -101,7 +102,7 @@ def _format_chapter(s:dict)->str:
 # %% ../nbs/00_core.ipynb 29
 @patch
 def format_chapters(self:YTVideo)->str:
-    if 'chapters' not in self.data: return
+    if self.data.get('chapters') is None: return
     return '\n'.join(map(_format_chapter, self.data['chapters']))
 
 # %% ../nbs/00_core.ipynb 32
