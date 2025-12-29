@@ -33,7 +33,7 @@ def from_url(cls:YTVideo, url:str, quiet:bool=True)->YTVideo:
         data = ydl.extract_info(url, download=False)
         return YTVideo(data)
 
-# %% ../nbs/00_core.ipynb 9
+# %% ../nbs/00_core.ipynb 10
 @patch
 def subtitles_url(self:YTVideo, language:str=None):
     lang = ifnone(language, self.data.get('language'))
@@ -41,7 +41,7 @@ def subtitles_url(self:YTVideo, language:str=None):
     if d is None: return
     return next(o['url'] for o in d[lang] if o['ext']=='srt')
 
-# %% ../nbs/00_core.ipynb 13
+# %% ../nbs/00_core.ipynb 14
 _subtitle_entry_pat = re.compile(r'(\d+)\n(\d+:\d+:\d+),\d+ --> (\d+:\d+:\d+),\d+\n(.+)', re.DOTALL)
 
 class SubtitleEntry:
@@ -52,10 +52,10 @@ class SubtitleEntry:
     def from_str(cls, s:str)->'Self':
         if s.count('\n')<2: return None
         match = _subtitle_entry_pat.match(s.strip())
-        text = re.sub(r'[\n\xa0]+', '\n', match.group(4))
+        text = re.sub(r'[\n\xa0]+', ' ', match.group(4))
         return cls(int(match.group(1)), match.group(2), match.group(3), text)
 
-# %% ../nbs/00_core.ipynb 15
+# %% ../nbs/00_core.ipynb 16
 class Subtitles:
     def __init__(self, entries:L): store_attr()
 
@@ -68,34 +68,107 @@ class Subtitles:
         entries = L.split(s.strip(), '\n\n').map(SubtitleEntry.from_str).filter()
         return cls(entries)
 
-# %% ../nbs/00_core.ipynb 17
+# %% ../nbs/00_core.ipynb 18
 @patch(cls_method=True)
 def from_url(cls:Subtitles, url:str)->Subtitles: return cls.from_str(httpx.get(url).text)
 
-# %% ../nbs/00_core.ipynb 19
+# %% ../nbs/00_core.ipynb 20
 @patch
 def format_subs(self:Subtitles)->str:
     "Formats subtitles to use in LLMs."
     return '\n'.join(self.entries.map(lambda o: f'[{o.start}] {o.text}'))
 
-# %% ../nbs/00_core.ipynb 21
+# %% ../nbs/00_core.ipynb 22
 @patch
 @delegates(YTVideo.subtitles_url)
 def fetch_subtitles(self:YTVideo, force:bool=False, **kwargs)->YTVideo:
     if force or (self.subtitles is None): self.subtitles = Subtitles.from_url(self.subtitles_url(**kwargs))
     return self
 
-# %% ../nbs/00_core.ipynb 23
+# %% ../nbs/00_core.ipynb 24
+@patch
+@delegates(YTVideo.fetch_subtitles)
+def format_subs(self:YTVideo, **kwargs)->str:
+    self.fetch_subtitles(**kwargs)
+    if self.subtitles is None: return
+    return self.subtitles.format_subs()
+
+# %% ../nbs/00_core.ipynb 27
 def _format_chapter(s:dict)->str:
     start = datetime.timedelta(seconds=s['start_time'])
     return f'[{start}] {s["title"]}'
 
-# %% ../nbs/00_core.ipynb 25
+# %% ../nbs/00_core.ipynb 29
 @patch
 def format_chapters(self:YTVideo)->str:
+    if 'chapters' not in self.data: return
     return '\n'.join(map(_format_chapter, self.data['chapters']))
 
-# %% ../nbs/00_core.ipynb 29
+# %% ../nbs/00_core.ipynb 32
+@patch
+@delegates(YTVideo.fetch_subtitles)
+def create_summary_prompt(self:YTVideo, **kwargs)->str:
+    self.fetch_subtitles(**kwargs)
+    transcript = self.format_subs()
+    if transcript is None: return
+    description = self.data.get('description')
+    chapters = self.format_chapters()
+    prompt = f'''In the <transcript> tag we have transcript of a video with the title: {self.data['title']!r}. \
+Analyse the transcript to generate a detailed summary of the content of the video.
+
+Your task:
+<task>
+1. Start with a 2-3 sentence overview of the entire video
+2. Identify where major topics begin and end (chapters)
+3. Summarise each chapter's key concepts, it should have very high information value. Do not miss any important topic.
+4. Extract all resources mentioned, e.g. links, books, papers, videos, YouTube channels etc.
+</task>
+
+Format your response in Markdown:
+<format>
+- Start with "## Overview" followed by the 2-3 sentence summary
+- For each chapter use: "## [Chapter Title] - HH:MM:SS", e.g.: "## Introduction - 00:02:30"
+- End with a "## Resources" section containing a list of the resources mentioned through the video, including a brief context.
+<format>
+
+Here is the transcript with timestamps:
+<transcript>
+{transcript}
+</transcript>'''
+
+    if description is not None:
+        prompt += f'''
+
+Here is the video description:
+<video-description>
+{description}
+</video-description>
+'''
+
+    if chapters is not None:
+        prompt += f'''
+
+Incase it is helpful, here are the chapters defined in the video. However, please use timestamps from the transcript when possible when constructing timestamped links. 
+<video-chapters>
+{chapters}
+</video-chapters>
+'''
+
+    prompt += '''
+
+Keep the following writing guidelines in mind:
+<guidelines>
+1. Do not add filler words. 
+2. Make every sentence information-dense without repetition.
+3. Get to the point while providing necessary context.
+4. Use short words and fewer words.
+5. Avoid overusing bullet points. Prefer flowing prose that combines related concepts. Use lists only for truly distinct items.
+</guidelines>
+
+Please go ahead and write the summary.'''
+    return prompt
+
+# %% ../nbs/00_core.ipynb 36
 class YTPlaylist:
     def __init__(self, data:dict): store_attr()
     def __repr__(self):
@@ -103,9 +176,16 @@ class YTPlaylist:
         sig = ', '.join(f'{o}={self.data[o]!r}' for o in flds)
         return f'YTPlaylist({sig})'
 
-# %% ../nbs/00_core.ipynb 30
+# %% ../nbs/00_core.ipynb 37
 @patch(cls_method=True)
 def from_url(cls:YTPlaylist, url:str, quiet:bool=True)->YTPlaylist:
     with YoutubeDL({'flat_playlist':True, 'extract_flat':True, 'quiet':quiet}) as ydl:
         data = ydl.extract_info(url, download=False)
         return YTPlaylist(data)
+
+# %% ../nbs/00_core.ipynb 40
+@patch
+@delegates(YTVideo.from_url)
+def get_videos(self:YTPlaylist, n_workers=4, progress=False, **kwargs)->L:
+    entries = L(self.data['entries']).itemgot('url').filter()
+    return parallel(partial(YTVideo.from_url, **kwargs), entries, threadpool=True, n_workers=n_workers, progress=progress)
