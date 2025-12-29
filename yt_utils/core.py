@@ -107,7 +107,7 @@ def format_chapters(self:YTVideo)->str:
 # %% ../nbs/00_core.ipynb 32
 @patch
 @delegates(YTVideo.fetch_subtitles)
-def create_summary_prompt(self:YTVideo, **kwargs)->str:
+def create_summary_prompt(self:YTVideo, user_prompt:str=None, **kwargs)->str:
     self.fetch_subtitles(**kwargs)
     transcript = self.format_subs()
     if transcript is None: return
@@ -166,6 +166,9 @@ Keep the following writing guidelines in mind:
 </guidelines>
 
 Please go ahead and write the summary.'''
+
+    if user_prompt is not None:
+        prompt += f"\n\nAdditional context/instructions from the user:\n<user-context>\n{user_prompt}\n</user-context>"
     return prompt
 
 # %% ../nbs/00_core.ipynb 36
