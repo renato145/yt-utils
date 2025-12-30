@@ -29,4 +29,5 @@ d = { 'settings': { 'branch': 'main',
                                'yt_utils.core.YTVideo.format_subs': ('core.html#ytvideo.format_subs', 'yt_utils/core.py'),
                                'yt_utils.core.YTVideo.from_url': ('core.html#ytvideo.from_url', 'yt_utils/core.py'),
                                'yt_utils.core.YTVideo.subtitles_url': ('core.html#ytvideo.subtitles_url', 'yt_utils/core.py'),
-                               'yt_utils.core._format_chapter': ('core.html#_format_chapter', 'yt_utils/core.py')}}}
+                               'yt_utils.core._format_chapter': ('core.html#_format_chapter', 'yt_utils/core.py'),
+                               'yt_utils.core._get_sub_url': ('core.html#_get_sub_url', 'yt_utils/core.py')}}}

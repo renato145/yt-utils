@@ -34,15 +34,23 @@ def from_url(cls:YTVideo, url:str, quiet:bool=True)->YTVideo:
         return YTVideo(data)
 
 # %% ../nbs/00_core.ipynb 10
+def _get_sub_url(data:dict, lang:str)->str:
+    for k,v in data.items():
+        if k.startswith(lang):
+            for o in v:
+                if o['ext']=='srt': return o['url']
+            
+    return
+
+# %% ../nbs/00_core.ipynb 13
 @patch
 def subtitles_url(self:YTVideo, lang:str=None):
-    lang = ifnone(lang, self.data.get('language'))
-    d = self.data.get('subtitles', self.data.get('automatic_captions'))
-    if d is None: return
-    if lang not in d: lang = list(d.keys())[0]
-    return next(o['url'] for o in d[lang] if o['ext']=='srt')
+    lang = ifnone(lang, self.data.get('language', 'en'))
+    url = _get_sub_url(self.data.get('subtitles', dict()), lang)
+    if url is None: url = _get_sub_url(self.data.get('automatic_captions', dict()), lang)
+    return url
 
-# %% ../nbs/00_core.ipynb 14
+# %% ../nbs/00_core.ipynb 17
 _subtitle_entry_pat = re.compile(r'(\d+)\n(\d+:\d+:\d+),\d+ --> (\d+:\d+:\d+),\d+\n(.+)', re.DOTALL)
 
 class SubtitleEntry:
@@ -56,7 +64,7 @@ class SubtitleEntry:
         text = re.sub(r'[\n\xa0]+', ' ', match.group(4))
         return cls(int(match.group(1)), match.group(2), match.group(3), text)
 
-# %% ../nbs/00_core.ipynb 16
+# %% ../nbs/00_core.ipynb 19
 class Subtitles:
     def __init__(self, entries:L): store_attr()
 
@@ -69,24 +77,24 @@ class Subtitles:
         entries = L.split(s.strip(), '\n\n').map(SubtitleEntry.from_str).filter()
         return cls(entries)
 
-# %% ../nbs/00_core.ipynb 18
+# %% ../nbs/00_core.ipynb 21
 @patch(cls_method=True)
 def from_url(cls:Subtitles, url:str)->Subtitles: return cls.from_str(httpx.get(url).text)
 
-# %% ../nbs/00_core.ipynb 20
+# %% ../nbs/00_core.ipynb 23
 @patch
 def format_subs(self:Subtitles)->str:
     "Formats subtitles to use in LLMs."
     return '\n'.join(self.entries.map(lambda o: f'[{o.start}] {o.text}'))
 
-# %% ../nbs/00_core.ipynb 22
+# %% ../nbs/00_core.ipynb 25
 @patch
 @delegates(YTVideo.subtitles_url)
 def fetch_subtitles(self:YTVideo, force:bool=False, **kwargs)->YTVideo:
     if force or (self.subtitles is None): self.subtitles = Subtitles.from_url(self.subtitles_url(**kwargs))
     return self
 
-# %% ../nbs/00_core.ipynb 24
+# %% ../nbs/00_core.ipynb 27
 @patch
 @delegates(YTVideo.fetch_subtitles)
 def format_subs(self:YTVideo, **kwargs)->str:
@@ -94,18 +102,18 @@ def format_subs(self:YTVideo, **kwargs)->str:
     if self.subtitles is None: return
     return self.subtitles.format_subs()
 
-# %% ../nbs/00_core.ipynb 27
+# %% ../nbs/00_core.ipynb 30
 def _format_chapter(s:dict)->str:
     start = datetime.timedelta(seconds=s['start_time'])
     return f'[{start}] {s["title"]}'
 
-# %% ../nbs/00_core.ipynb 29
+# %% ../nbs/00_core.ipynb 32
 @patch
 def format_chapters(self:YTVideo)->str:
     if self.data.get('chapters') is None: return
     return '\n'.join(map(_format_chapter, self.data['chapters']))
 
-# %% ../nbs/00_core.ipynb 32
+# %% ../nbs/00_core.ipynb 35
 @patch
 @delegates(YTVideo.fetch_subtitles)
 def create_summary_prompt(self:YTVideo, user_prompt:str=None, **kwargs)->str:
@@ -120,7 +128,8 @@ The goal is to analyse the transcript to generate a detailed summary of the cont
 Your task:
 1. Start with an overview of the entire video.
 2. Identify chapters, where major topics begin and end.
-3. Summarise each chapter key concepts, the summary should have very high information value and shouldn't miss any important topic.
+3. Summarise each chapter key concepts, the summary should have very high information value and shouldn't miss \
+any important topic.
 4. Extract all resources mentioned, e.g. links, books, papers, videos, YouTube channels etc.
 
 Here is the transcript with timestamps:
@@ -139,7 +148,8 @@ Here is the video description:
     if chapters is not None:
         prompt += f'''
 
-Incase it is helpful, here are the chapters defined in the video. However, please use timestamps from the transcript when possible. 
+Incase it is helpful, here are the chapters defined in the video. However, please use timestamps from the \
+transcript when possible. 
 <video-chapters>
 {chapters}
 </video-chapters>'''
@@ -151,14 +161,16 @@ Incase it is helpful, here are the chapters defined in the video. However, pleas
 
 Format your response using Markdown:
 - Start with an "## Overview" section containing the whole video summary.
-- For each chapter add a section with a heading that includes a timestamp in the format: "## [Chapter Title] - HH:MM:SS" (e.g. "## Introduction - 00:02:30").
+- For each chapter add a section with a heading that includes a timestamp in the format: \
+"## [Chapter Title] - HH:MM:SS" (e.g. "## Introduction - 00:02:30").
 - Follow each chapter heading with a succinct summary and bullet points for key points if necessary.
-- End with a "## Resources" section containing a list of the resources mentioned through the video, including a brief context.
+- End with a "## Resources" section containing a list of the resources mentioned through the video, \
+including a brief context.
 
 Please go ahead and carefully write the detailed summary of the video.'''
     return prompt
 
-# %% ../nbs/00_core.ipynb 36
+# %% ../nbs/00_core.ipynb 39
 class YTPlaylist:
     def __init__(self, data:dict): store_attr()
     def __repr__(self):
@@ -166,14 +178,14 @@ class YTPlaylist:
         sig = ', '.join(f'{o}={self.data[o]!r}' for o in flds)
         return f'YTPlaylist({sig})'
 
-# %% ../nbs/00_core.ipynb 37
+# %% ../nbs/00_core.ipynb 40
 @patch(cls_method=True)
 def from_url(cls:YTPlaylist, url:str, quiet:bool=True)->YTPlaylist:
     with YoutubeDL({'flat_playlist':True, 'extract_flat':True, 'quiet':quiet}) as ydl:
         data = ydl.extract_info(url, download=False)
         return YTPlaylist(data)
 
-# %% ../nbs/00_core.ipynb 40
+# %% ../nbs/00_core.ipynb 43
 @patch
 @delegates(YTVideo.from_url)
 def get_videos(self:YTPlaylist, n_workers=4, progress=False, **kwargs)->L:
